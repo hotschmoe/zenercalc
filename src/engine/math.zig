@@ -17,6 +17,26 @@ pub const RectSection = struct {
     pub fn momentOfInertia(self: RectSection) f64 {
         return self.b * self.d * self.d * self.d / 12.0;
     }
+
+    // Weak-axis (y-axis) section modulus: S_y = d * b^2 / 6
+    pub fn sectionModulusWeak(self: RectSection) f64 {
+        return self.d * self.b * self.b / 6.0;
+    }
+
+    // Weak-axis (y-axis) moment of inertia: I_y = d * b^3 / 12
+    pub fn momentOfInertiaWeak(self: RectSection) f64 {
+        return self.d * self.b * self.b * self.b / 12.0;
+    }
+
+    // Strong-axis (x-axis) radius of gyration: r_x = d / sqrt(12)
+    pub fn radiusOfGyration(self: RectSection) f64 {
+        return self.d / @sqrt(12.0);
+    }
+
+    // Weak-axis (y-axis) radius of gyration: r_y = b / sqrt(12)
+    pub fn radiusOfGyrationWeak(self: RectSection) f64 {
+        return self.b / @sqrt(12.0);
+    }
 };
 
 // -- Load Types -----------------------------------------------------------
@@ -241,6 +261,30 @@ test "RectSection 2x10 nominal" {
     try std.testing.expectApproxEqAbs(sec.area(), 13.875, 0.001);
     try std.testing.expectApproxEqAbs(sec.sectionModulus(), 21.3906, 0.01);
     try std.testing.expectApproxEqAbs(sec.momentOfInertia(), 98.932, 0.01);
+}
+
+test "RectSection 6x6 post biaxial symmetry" {
+    const sec = RectSection{ .b = 5.5, .d = 5.5 };
+    // Square section: strong and weak axes are equal
+    try std.testing.expectApproxEqAbs(sec.sectionModulus(), sec.sectionModulusWeak(), 0.001);
+    try std.testing.expectApproxEqAbs(sec.momentOfInertia(), sec.momentOfInertiaWeak(), 0.001);
+    try std.testing.expectApproxEqAbs(sec.radiusOfGyration(), sec.radiusOfGyrationWeak(), 0.001);
+    // S = 5.5^3 / 6 = 27.729
+    try std.testing.expectApproxEqAbs(sec.sectionModulus(), 27.729, 0.01);
+    // r = 5.5 / sqrt(12) = 1.588
+    try std.testing.expectApproxEqAbs(sec.radiusOfGyration(), 1.588, 0.01);
+}
+
+test "RectSection 4x8 weak-axis properties" {
+    const sec = RectSection{ .b = 3.5, .d = 7.25 };
+    // Weak-axis: S_y = d * b^2 / 6 = 7.25 * 3.5^2 / 6 = 14.802
+    try std.testing.expectApproxEqAbs(sec.sectionModulusWeak(), 14.802, 0.01);
+    // I_y = d * b^3 / 12 = 7.25 * 3.5^3 / 12 = 25.904
+    try std.testing.expectApproxEqAbs(sec.momentOfInertiaWeak(), 25.904, 0.01);
+    // r_x = 7.25 / sqrt(12) = 2.093
+    try std.testing.expectApproxEqAbs(sec.radiusOfGyration(), 2.093, 0.01);
+    // r_y = 3.5 / sqrt(12) = 1.010
+    try std.testing.expectApproxEqAbs(sec.radiusOfGyrationWeak(), 1.010, 0.01);
 }
 
 test "UDL midspan moment = wL^2/8" {

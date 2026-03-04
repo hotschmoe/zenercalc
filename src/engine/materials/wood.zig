@@ -181,6 +181,35 @@ pub const WoodMaterial = union(enum) {
             .glulam => |g| lookupGlulam(g.stress_class).sg,
         };
     }
+
+    pub fn referenceFc(self: WoodMaterial) f64 {
+        return switch (self) {
+            .sawn_lumber => |s| (lookupLumber(s.species, s.grade) orelse unreachable).fc,
+            .glulam => |g| lookupGlulam(g.stress_class).fc,
+        };
+    }
+
+    pub fn referenceFcPerp(self: WoodMaterial) f64 {
+        return switch (self) {
+            .sawn_lumber => |s| (lookupLumber(s.species, s.grade) orelse unreachable).fc_perp,
+            .glulam => |g| lookupGlulam(g.stress_class).fc_perp,
+        };
+    }
+
+    pub fn referenceFt(self: WoodMaterial) f64 {
+        return switch (self) {
+            .sawn_lumber => |s| (lookupLumber(s.species, s.grade) orelse unreachable).ft,
+            .glulam => |g| lookupGlulam(g.stress_class).ft,
+        };
+    }
+
+    // NDS 2018 Table 3.7: c = 0.8 for sawn lumber, 0.9 for glulam
+    pub fn bucklingC(self: WoodMaterial) f64 {
+        return switch (self) {
+            .sawn_lumber => 0.8,
+            .glulam => 0.9,
+        };
+    }
 };
 
 // -- Tests ----------------------------------------------------------------

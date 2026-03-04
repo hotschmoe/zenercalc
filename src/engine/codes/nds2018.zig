@@ -191,6 +191,156 @@ pub fn effectiveLength(lu_ft: f64, d_in: f64) f64 {
     }
 }
 
+// -- Column Stability Factor (Cp) ----------------------------------------
+
+// NDS 2018 Section 3.7.1, Equation 3.7-1
+// c = 0.8 for sawn lumber, 0.9 for glulam (NDS Table 3.7)
+pub fn cp(fc_star: f64, e_min_prime: f64, le_in: f64, d_in: f64, c: f64) f64 {
+    if (le_in <= 0) return 1.0;
+    if (d_in <= 0) return 0.0;
+
+    const le_d = le_in / d_in;
+
+    // NDS 3.7.1.4: le/d shall not exceed 50
+    if (le_d > 50.0) return 0.0;
+
+    if (fc_star <= 0) return 0.0;
+
+    // FcE = 0.822 * E'min / (le/d)^2  -- NDS Eq. 3.7-1
+    const f_ce = 0.822 * e_min_prime / (le_d * le_d);
+
+    // Cp = (1 + FcE/Fc*) / (2c) - sqrt[((1 + FcE/Fc*) / (2c))^2 - (FcE/Fc*) / c]
+    const ratio = f_ce / fc_star;
+    const term1 = (1.0 + ratio) / (2.0 * c);
+    const cp_val = term1 - @sqrt(term1 * term1 - ratio / c);
+
+    return @min(cp_val, 1.0);
+}
+
+// Critical buckling stress for column stability
+// FcE = 0.822 * E'min / (le/d)^2  -- NDS Eq. 3.7-1
+pub fn fce(e_min_prime: f64, le_in: f64, d_in: f64) f64 {
+    if (le_in <= 0 or d_in <= 0) return 0.0;
+    const le_d = le_in / d_in;
+    return 0.822 * e_min_prime / (le_d * le_d);
+}
+
+// -- Column Adjusted Values -----------------------------------------------
+
+pub const ColumnAdjustedValues = struct {
+    fc_star: f64, // Fc with all factors except Cp
+    fc_prime_x: f64, // Fc' for x-axis buckling (Fc* * Cp_x)
+    fc_prime_y: f64, // Fc' for y-axis buckling (Fc* * Cp_y)
+    fc_prime: f64, // Fc' governing (min of x and y)
+    fc_perp_prime: f64, // Fc_perp' for bearing
+    fb_prime: f64, // Fb' for bending
+    fv_prime: f64, // Fv' for shear
+    e_prime: f64,
+    e_min_prime: f64,
+    cp_x: f64, // Column stability factor, x-axis
+    cp_y: f64, // Column stability factor, y-axis
+    fce_x: f64, // Critical buckling stress, x-axis
+    fce_y: f64, // Critical buckling stress, y-axis
+    c_d: f64,
+    c_m_fc: f64,
+    c_m_fb: f64,
+    c_m_fv: f64,
+    c_m_e: f64,
+    c_t: f64,
+    c_f_fc: f64,
+    c_f_fb: f64,
+    c_i_strength: f64,
+    c_i_e: f64,
+};
+
+pub const ColumnAdjustmentInputs = struct {
+    load_duration: loads.LoadDuration = .normal,
+    moisture: MoistureCondition = .dry,
+    temperature: TemperatureCondition = .normal,
+    incising: IncisingCondition = .none,
+    le_x_in: f64 = 0, // effective length for x-axis buckling
+    le_y_in: f64 = 0, // effective length for y-axis buckling
+    buckling_c: f64 = 0.8, // 0.8 sawn, 0.9 glulam
+};
+
+pub fn columnAdjustedValues(
+    fc_ref: f64,
+    fc_perp_ref: f64,
+    fb_ref: f64,
+    fv_ref: f64,
+    e_ref: f64,
+    e_min_ref: f64,
+    width_in: f64,
+    depth_in: f64,
+    inputs: ColumnAdjustmentInputs,
+) ColumnAdjustedValues {
+    const c_d = inputs.load_duration.factor();
+    const c_m_fc_val = cmFc(inputs.moisture);
+    const c_m_fb_val = cmFb(inputs.moisture);
+    const c_m_fv_val = cmFv(inputs.moisture);
+    const c_m_e_val = cmE(inputs.moisture);
+    const c_m_fc_perp_val = cmFcPerp(inputs.moisture);
+    const c_t_val = ct(inputs.temperature, inputs.moisture);
+    const c_f_fc_val = cfFc(depth_in);
+    const c_f_fb_val = cfFb(depth_in);
+    const c_i_str = ciStrength(inputs.incising);
+    const c_i_e_val = ciE(inputs.incising);
+
+    // E' and E'min
+    const e_prime = e_ref * c_m_e_val * c_t_val * c_i_e_val;
+    const e_min_prime = e_min_ref * c_m_e_val * c_t_val * c_i_e_val;
+
+    // Fc* = Fc * CD * CM * Ct * CF * Ci  (all factors except Cp)
+    const fc_star = fc_ref * c_d * c_m_fc_val * c_t_val * c_f_fc_val * c_i_str;
+
+    // Column stability factors for each axis
+    // x-axis buckling: column buckles about x-axis, dimension is depth (d)
+    const fce_x_val = fce(e_min_prime, inputs.le_x_in, depth_in);
+    const cp_x_val = cp(fc_star, e_min_prime, inputs.le_x_in, depth_in, inputs.buckling_c);
+    // y-axis buckling: column buckles about y-axis, dimension is width (b)
+    const fce_y_val = fce(e_min_prime, inputs.le_y_in, width_in);
+    const cp_y_val = cp(fc_star, e_min_prime, inputs.le_y_in, width_in, inputs.buckling_c);
+
+    const fc_prime_x = fc_star * cp_x_val;
+    const fc_prime_y = fc_star * cp_y_val;
+    const fc_prime = @min(fc_prime_x, fc_prime_y);
+
+    // Fc_perp' = Fc_perp * CM * Ct * Ci
+    const fc_perp_prime = fc_perp_ref * c_m_fc_perp_val * c_t_val * c_i_str;
+
+    // Fb' = Fb * CD * CM * Ct * CF * Ci  (CL=1.0 for columns, no Cr, no Cfu)
+    const fb_prime = fb_ref * c_d * c_m_fb_val * c_t_val * c_f_fb_val * c_i_str;
+
+    // Fv' = Fv * CD * CM * Ct * Ci
+    const fv_prime = fv_ref * c_d * c_m_fv_val * c_t_val * c_i_str;
+
+    return .{
+        .fc_star = fc_star,
+        .fc_prime_x = fc_prime_x,
+        .fc_prime_y = fc_prime_y,
+        .fc_prime = fc_prime,
+        .fc_perp_prime = fc_perp_prime,
+        .fb_prime = fb_prime,
+        .fv_prime = fv_prime,
+        .e_prime = e_prime,
+        .e_min_prime = e_min_prime,
+        .cp_x = cp_x_val,
+        .cp_y = cp_y_val,
+        .fce_x = fce_x_val,
+        .fce_y = fce_y_val,
+        .c_d = c_d,
+        .c_m_fc = c_m_fc_val,
+        .c_m_fb = c_m_fb_val,
+        .c_m_fv = c_m_fv_val,
+        .c_m_e = c_m_e_val,
+        .c_t = c_t_val,
+        .c_f_fc = c_f_fc_val,
+        .c_f_fb = c_f_fb_val,
+        .c_i_strength = c_i_str,
+        .c_i_e = c_i_e_val,
+    };
+}
+
 // -- Adjustment Input Bundle ----------------------------------------------
 
 pub const AdjustmentInputs = struct {
@@ -332,6 +482,59 @@ test "adjusted Fb with snow + repetitive" {
     // Fb' = 900 * 1.15 * 1.0 * 1.0 * 1.0 * 1.1 * 1.0 * 1.0 * 1.15 = 1309.5
     // (CD=1.15, CM=1.0, Ct=1.0, CL=1.0, CF=1.1, Cfu=1.0, Ci=1.0, Cr=1.15)
     try std.testing.expectApproxEqRel(adj.fb_prime, 1309.275, 0.01);
+}
+
+test "Cp short column approaches 1.0" {
+    // Very short column: Cp should be close to 1.0
+    const fc_star: f64 = 1350.0 * 1.15; // Fc * CF for 6x6
+    const e_min_prime: f64 = 580_000.0;
+    const le_in: f64 = 12.0; // 1 foot
+    const d_in: f64 = 5.5;
+    const cp_val = cp(fc_star, e_min_prime, le_in, d_in, 0.8);
+    try std.testing.expect(cp_val > 0.99);
+}
+
+test "Cp 6x6 DF-L No.2 at 10ft" {
+    // 6x6 DF-L No.2: Fc=1350, Emin=580000, d=5.5
+    const fc_star: f64 = 1350.0 * 1.0 * 1.15; // Fc * CD(normal) * CF(6x6)
+    const e_min_prime: f64 = 580_000.0;
+    const le_in: f64 = 10.0 * 12.0; // 10 ft
+    const d_in: f64 = 5.5;
+    const cp_val = cp(fc_star, e_min_prime, le_in, d_in, 0.8);
+    // le/d = 120/5.5 = 21.8, moderate slenderness
+    try std.testing.expect(cp_val > 0.2);
+    try std.testing.expect(cp_val < 0.8);
+}
+
+test "Cp returns 0 for le/d > 50" {
+    const cp_val = cp(1000.0, 580_000.0, 300.0, 5.5, 0.8);
+    // le/d = 300/5.5 = 54.5 > 50
+    try std.testing.expectApproxEqAbs(cp_val, 0.0, 0.001);
+}
+
+test "columnAdjustedValues basic" {
+    // 6x6 DF-L No.2, 10' height
+    const adj = columnAdjustedValues(
+        1350, // fc
+        625, // fc_perp
+        900, // fb
+        180, // fv
+        1_600_000, // e
+        580_000, // e_min
+        5.5, // width
+        5.5, // depth
+        .{
+            .le_x_in = 120.0,
+            .le_y_in = 120.0,
+            .buckling_c = 0.8,
+        },
+    );
+    // Both axes equal for square section
+    try std.testing.expectApproxEqAbs(adj.cp_x, adj.cp_y, 0.001);
+    try std.testing.expect(adj.fc_prime > 0);
+    try std.testing.expect(adj.fc_prime < adj.fc_star);
+    try std.testing.expect(adj.fb_prime > 0);
+    try std.testing.expect(adj.fv_prime > 0);
 }
 
 test "adjusted Fv with snow" {
