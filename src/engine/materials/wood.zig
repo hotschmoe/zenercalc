@@ -141,66 +141,65 @@ pub fn lookupGlulam(stress_class: GlulamStressClass) GlulamProps {
     unreachable;
 }
 
-// Unified material type for the wood_beam module
+// Normalized reference design values shared across lumber and glulam
+pub const ReferenceProps = struct {
+    fb: f64,
+    ft: f64,
+    fv: f64,
+    fc: f64,
+    fc_perp: f64,
+    e: f64,
+    e_min: f64,
+    sg: f64,
+};
 
 pub const WoodMaterial = union(enum) {
     sawn_lumber: struct { species: Species, grade: Grade },
     glulam: struct { stress_class: GlulamStressClass },
 
-    pub fn referenceFb(self: WoodMaterial) f64 {
+    pub fn referenceProps(self: WoodMaterial) ReferenceProps {
         return switch (self) {
-            .sawn_lumber => |s| (lookupLumber(s.species, s.grade) orelse unreachable).fb,
-            .glulam => |g| lookupGlulam(g.stress_class).fb_pos,
+            .sawn_lumber => |s| blk: {
+                const p = lookupLumber(s.species, s.grade) orelse unreachable;
+                break :blk .{ .fb = p.fb, .ft = p.ft, .fv = p.fv, .fc = p.fc, .fc_perp = p.fc_perp, .e = p.e, .e_min = p.e_min, .sg = p.sg };
+            },
+            .glulam => |g| blk: {
+                const p = lookupGlulam(g.stress_class);
+                break :blk .{ .fb = p.fb_pos, .ft = p.ft, .fv = p.fv, .fc = p.fc, .fc_perp = p.fc_perp, .e = p.e, .e_min = p.e_min, .sg = p.sg };
+            },
         };
+    }
+
+    pub fn referenceFb(self: WoodMaterial) f64 {
+        return self.referenceProps().fb;
     }
 
     pub fn referenceFv(self: WoodMaterial) f64 {
-        return switch (self) {
-            .sawn_lumber => |s| (lookupLumber(s.species, s.grade) orelse unreachable).fv,
-            .glulam => |g| lookupGlulam(g.stress_class).fv,
-        };
+        return self.referenceProps().fv;
     }
 
     pub fn referenceE(self: WoodMaterial) f64 {
-        return switch (self) {
-            .sawn_lumber => |s| (lookupLumber(s.species, s.grade) orelse unreachable).e,
-            .glulam => |g| lookupGlulam(g.stress_class).e,
-        };
+        return self.referenceProps().e;
     }
 
     pub fn referenceEmin(self: WoodMaterial) f64 {
-        return switch (self) {
-            .sawn_lumber => |s| (lookupLumber(s.species, s.grade) orelse unreachable).e_min,
-            .glulam => |g| lookupGlulam(g.stress_class).e_min,
-        };
+        return self.referenceProps().e_min;
     }
 
     pub fn specificGravity(self: WoodMaterial) f64 {
-        return switch (self) {
-            .sawn_lumber => |s| (lookupLumber(s.species, s.grade) orelse unreachable).sg,
-            .glulam => |g| lookupGlulam(g.stress_class).sg,
-        };
+        return self.referenceProps().sg;
     }
 
     pub fn referenceFc(self: WoodMaterial) f64 {
-        return switch (self) {
-            .sawn_lumber => |s| (lookupLumber(s.species, s.grade) orelse unreachable).fc,
-            .glulam => |g| lookupGlulam(g.stress_class).fc,
-        };
+        return self.referenceProps().fc;
     }
 
     pub fn referenceFcPerp(self: WoodMaterial) f64 {
-        return switch (self) {
-            .sawn_lumber => |s| (lookupLumber(s.species, s.grade) orelse unreachable).fc_perp,
-            .glulam => |g| lookupGlulam(g.stress_class).fc_perp,
-        };
+        return self.referenceProps().fc_perp;
     }
 
     pub fn referenceFt(self: WoodMaterial) f64 {
-        return switch (self) {
-            .sawn_lumber => |s| (lookupLumber(s.species, s.grade) orelse unreachable).ft,
-            .glulam => |g| lookupGlulam(g.stress_class).ft,
-        };
+        return self.referenceProps().ft;
     }
 
     // NDS 2018 Table 3.7: c = 0.8 for sawn lumber, 0.9 for glulam

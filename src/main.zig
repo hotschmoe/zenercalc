@@ -73,6 +73,26 @@ fn detectModule(bytes: []const u8) ParseError![]const u8 {
     return "wood_beam"; // default
 }
 
+fn parseMaterial(root: std.json.ObjectMap) ParseError!wood.WoodMaterial {
+    const mat_val = root.get("material") orelse return error.UnknownMaterial;
+    if (mat_val != .object) return error.UnknownMaterial;
+    const mat = mat_val.object;
+
+    const type_val = mat.get("type") orelse return error.UnknownMaterial;
+    const mt = if (type_val == .string) type_val.string else return error.UnknownMaterial;
+
+    if (std.mem.eql(u8, mt, "sawn_lumber")) {
+        const species = parseSpecies(mat) orelse return error.UnknownSpecies;
+        const grade = parseGrade(mat) orelse return error.UnknownGrade;
+        return .{ .sawn_lumber = .{ .species = species, .grade = grade } };
+    } else if (std.mem.eql(u8, mt, "glulam")) {
+        const sc = parseStressClass(mat) orelse return error.UnknownStressClass;
+        return .{ .glulam = .{ .stress_class = sc } };
+    } else {
+        return error.UnknownMaterial;
+    }
+}
+
 fn parseInputs(bytes: []const u8) ParseError!wood_beam.Inputs {
     const parsed = std.json.parseFromSlice(std.json.Value, std.heap.page_allocator, bytes, .{}) catch
         return error.InvalidJson;
@@ -84,30 +104,12 @@ fn parseInputs(bytes: []const u8) ParseError!wood_beam.Inputs {
         .span_ft = getFloat(root, "span_ft") orelse 0,
         .width_in = getFloat(root, "width_in") orelse 0,
         .depth_in = getFloat(root, "depth_in") orelse 0,
-        .material = undefined,
+        .material = try parseMaterial(root),
         .dead_load_plf = getFloat(root, "dead_load_plf") orelse 0,
         .live_load_plf = getFloat(root, "live_load_plf") orelse 0,
         .snow_load_plf = getFloat(root, "snow_load_plf") orelse 0,
         .wind_load_plf = getFloat(root, "wind_load_plf") orelse 0,
     };
-
-    const mat_val = root.get("material") orelse return error.UnknownMaterial;
-    if (mat_val != .object) return error.UnknownMaterial;
-    const mat = mat_val.object;
-
-    const type_val = mat.get("type") orelse return error.UnknownMaterial;
-    const mt = if (type_val == .string) type_val.string else return error.UnknownMaterial;
-
-    if (std.mem.eql(u8, mt, "sawn_lumber")) {
-        const species = parseSpecies(mat) orelse return error.UnknownSpecies;
-        const grade = parseGrade(mat) orelse return error.UnknownGrade;
-        inputs.material = .{ .sawn_lumber = .{ .species = species, .grade = grade } };
-    } else if (std.mem.eql(u8, mt, "glulam")) {
-        const sc = parseStressClass(mat) orelse return error.UnknownStressClass;
-        inputs.material = .{ .glulam = .{ .stress_class = sc } };
-    } else {
-        return error.UnknownMaterial;
-    }
 
     if (root.get("include_self_weight")) |v| {
         if (v == .bool) inputs.include_self_weight = v.bool;
@@ -235,7 +237,7 @@ fn parseColumnInputs(bytes: []const u8) ParseError!wood_column.Inputs {
         .height_ft = getFloat(root, "height_ft") orelse 0,
         .width_in = getFloat(root, "width_in") orelse 0,
         .depth_in = getFloat(root, "depth_in") orelse 0,
-        .material = undefined,
+        .material = try parseMaterial(root),
         .axial_dead_lb = getFloat(root, "axial_dead_lb") orelse 0,
         .axial_live_lb = getFloat(root, "axial_live_lb") orelse 0,
         .axial_snow_lb = getFloat(root, "axial_snow_lb") orelse 0,
@@ -245,24 +247,6 @@ fn parseColumnInputs(bytes: []const u8) ParseError!wood_column.Inputs {
         .moment_y_dead_ft_lb = getFloat(root, "moment_y_dead_ft_lb") orelse 0,
         .moment_y_live_ft_lb = getFloat(root, "moment_y_live_ft_lb") orelse 0,
     };
-
-    const mat_val = root.get("material") orelse return error.UnknownMaterial;
-    if (mat_val != .object) return error.UnknownMaterial;
-    const mat = mat_val.object;
-
-    const type_val = mat.get("type") orelse return error.UnknownMaterial;
-    const mt = if (type_val == .string) type_val.string else return error.UnknownMaterial;
-
-    if (std.mem.eql(u8, mt, "sawn_lumber")) {
-        const species = parseSpecies(mat) orelse return error.UnknownSpecies;
-        const grade = parseGrade(mat) orelse return error.UnknownGrade;
-        inputs.material = .{ .sawn_lumber = .{ .species = species, .grade = grade } };
-    } else if (std.mem.eql(u8, mt, "glulam")) {
-        const sc = parseStressClass(mat) orelse return error.UnknownStressClass;
-        inputs.material = .{ .glulam = .{ .stress_class = sc } };
-    } else {
-        return error.UnknownMaterial;
-    }
 
     if (root.get("include_self_weight")) |v| {
         if (v == .bool) inputs.include_self_weight = v.bool;

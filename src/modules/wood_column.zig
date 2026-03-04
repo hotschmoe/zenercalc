@@ -120,18 +120,12 @@ pub fn compute(inputs: Inputs) ComputeError!Outputs {
     if (le_d_x > 50.0 or le_d_y > 50.0) return error.SlendernessExceeded;
 
     // 4. Material properties
-    const fc_ref = inputs.material.referenceFc();
-    const fc_perp_ref = inputs.material.referenceFcPerp();
-    const fb_ref = inputs.material.referenceFb();
-    const fv_ref = inputs.material.referenceFv();
-    const e_ref = inputs.material.referenceE();
-    const e_min_ref = inputs.material.referenceEmin();
-    const sg = inputs.material.specificGravity();
+    const ref = inputs.material.referenceProps();
     const buckling_c = inputs.material.bucklingC();
 
     // 5. Self weight = sg * 62.4 * A / 144 * height_ft (total lbs)
     const self_weight_lb = if (inputs.include_self_weight)
-        sg * 62.4 * area / 144.0 * inputs.height_ft
+        ref.sg * 62.4 * area / 144.0 * inputs.height_ft
     else
         0;
 
@@ -176,12 +170,12 @@ pub fn compute(inputs: Inputs) ComputeError!Outputs {
 
         // Adjusted values with this combo's load duration
         const adj = nds.columnAdjustedValues(
-            fc_ref,
-            fc_perp_ref,
-            fb_ref,
-            fv_ref,
-            e_ref,
-            e_min_ref,
+            ref.fc,
+            ref.fc_perp,
+            ref.fb,
+            ref.fv,
+            ref.e,
+            ref.e_min,
             inputs.width_in,
             inputs.depth_in,
             .{

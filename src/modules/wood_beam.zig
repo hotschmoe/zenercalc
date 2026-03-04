@@ -114,11 +114,7 @@ pub fn compute(inputs: Inputs) ComputeError!Outputs {
     if (inputs.width_in <= 0 or inputs.depth_in <= 0) return error.InvalidSection;
 
     // 2. Material properties
-    const fb_ref = inputs.material.referenceFb();
-    const fv_ref = inputs.material.referenceFv();
-    const e_ref = inputs.material.referenceE();
-    const e_min_ref = inputs.material.referenceEmin();
-    const sg = inputs.material.specificGravity();
+    const ref = inputs.material.referenceProps();
 
     // 3. Section properties
     const section = beam_math.RectSection{ .b = inputs.width_in, .d = inputs.depth_in };
@@ -128,7 +124,7 @@ pub fn compute(inputs: Inputs) ComputeError!Outputs {
 
     // 4. Self weight: weight_pcf = sg * 62.4; plf = weight_pcf * area / 144
     const self_weight_plf = if (inputs.include_self_weight)
-        sg * 62.4 * area / 144.0
+        ref.sg * 62.4 * area / 144.0
     else
         0;
 
@@ -157,7 +153,7 @@ pub fn compute(inputs: Inputs) ComputeError!Outputs {
         .compression_edge_braced = inputs.compression_edge_braced,
         .unbraced_length_ft = inputs.unbraced_length_ft,
     };
-    const adjusted = nds.adjustedValues(fb_ref, fv_ref, e_ref, e_min_ref, inputs.width_in, inputs.depth_in, adj_inputs);
+    const adjusted = nds.adjustedValues(ref.fb, ref.fv, ref.e, ref.e_min, inputs.width_in, inputs.depth_in, adj_inputs);
 
     // 8. Build load array for beam analysis
     // Factored total uniform load for strength
