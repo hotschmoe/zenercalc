@@ -14,17 +14,11 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(gpa);
     defer std.process.argsFree(gpa, args);
 
-    var input_bytes: []const u8 = undefined;
-    var allocated = false;
-
-    if (args.len > 1) {
-        input_bytes = try std.fs.cwd().readFileAlloc(gpa, args[1], 1024 * 1024);
-        allocated = true;
-    } else {
-        input_bytes = try std.fs.File.stdin().readToEndAlloc(gpa, 1024 * 1024);
-        allocated = true;
-    }
-    defer if (allocated) gpa.free(input_bytes);
+    const input_bytes = if (args.len > 1)
+        try std.fs.cwd().readFileAlloc(gpa, args[1], 1024 * 1024)
+    else
+        try std.fs.File.stdin().readToEndAlloc(gpa, 1024 * 1024);
+    defer gpa.free(input_bytes);
 
     const inputs = parseInputs(input_bytes) catch |err| {
         try writeError(err);
@@ -72,27 +66,20 @@ fn parseInputs(bytes: []const u8) ParseError!wood_beam.Inputs {
         .wind_load_plf = getFloat(root, "wind_load_plf") orelse 0,
     };
 
-    if (root.get("material")) |mat_val| {
-        if (mat_val == .object) {
-            const mat = mat_val.object;
-            const mat_type = if (mat.get("type")) |t| (if (t == .string) t.string else null) else null;
-            if (mat_type) |mt| {
-                if (std.mem.eql(u8, mt, "sawn_lumber")) {
-                    const species = parseSpecies(mat) orelse return error.UnknownSpecies;
-                    const grade = parseGrade(mat) orelse return error.UnknownGrade;
-                    inputs.material = .{ .sawn_lumber = .{ .species = species, .grade = grade } };
-                } else if (std.mem.eql(u8, mt, "glulam")) {
-                    const sc = parseStressClass(mat) orelse return error.UnknownStressClass;
-                    inputs.material = .{ .glulam = .{ .stress_class = sc } };
-                } else {
-                    return error.UnknownMaterial;
-                }
-            } else {
-                return error.UnknownMaterial;
-            }
-        } else {
-            return error.UnknownMaterial;
-        }
+    const mat_val = root.get("material") orelse return error.UnknownMaterial;
+    if (mat_val != .object) return error.UnknownMaterial;
+    const mat = mat_val.object;
+
+    const type_val = mat.get("type") orelse return error.UnknownMaterial;
+    const mt = if (type_val == .string) type_val.string else return error.UnknownMaterial;
+
+    if (std.mem.eql(u8, mt, "sawn_lumber")) {
+        const species = parseSpecies(mat) orelse return error.UnknownSpecies;
+        const grade = parseGrade(mat) orelse return error.UnknownGrade;
+        inputs.material = .{ .sawn_lumber = .{ .species = species, .grade = grade } };
+    } else if (std.mem.eql(u8, mt, "glulam")) {
+        const sc = parseStressClass(mat) orelse return error.UnknownStressClass;
+        inputs.material = .{ .glulam = .{ .stress_class = sc } };
     } else {
         return error.UnknownMaterial;
     }
