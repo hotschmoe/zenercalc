@@ -8,25 +8,34 @@ Built from scratch in Zig. Zero bloat. Every formula cites its code section. All
 
 ---
 
-## Current Status: Phase 1 Complete
+## Current Status: Phase 2 Complete
 
-Wood beam and wood column calculators are implemented and functional:
+Three calculation modules are implemented and functional:
 
-**Wood Beam:**
-- NDS 2018 sawn lumber (5 species x 4 grades) and glulam (7 stress classes)
+**Wood Beam (NDS 2018):**
+- Sawn lumber (5 species x 4 grades) and glulam (7 stress classes)
 - All 8 NDS adjustment factors (CD, CM, Ct, CF, Cfu, Ci, Cr, CL) with code citations
 - ASCE 7-22 ASD load combinations (21 combos including wind uplift)
 - Simple beam analysis with moment, shear, and deflection diagrams (51 points)
 - Design checks with DCR ratios for bending, shear, and deflection
 
-**Wood Column:**
-- NDS 2018 Section 3.7 column stability factor (Cp) with biaxial buckling
-- NDS 2018 Section 3.9 combined axial + bending interaction (Eq. 3.9-3)
+**Wood Column (NDS 2018):**
+- Section 3.7 column stability factor (Cp) with biaxial buckling
+- Section 3.9 combined axial + bending interaction (Eq. 3.9-3)
 - Per-combo load duration adjustment across all 21 ASD combos
 - Supports axial loads + biaxial moments, self-weight, effective length factors (Ke)
 - Design checks with DCR ratios for compression and interaction
 
-Both modules use CLI with JSON-in/JSON-out.
+**Spread Footing (ACI 318-19):**
+- Soil bearing pressure with kern exceedance handling (triangular distribution)
+- One-way shear at critical section d from column face
+- Two-way (punching) shear with all three ACI equations (Table 22.6.5.2)
+- Flexural reinforcement design with minimum steel check
+- Development length verification (Section 25.4.2)
+- Overturning and sliding stability checks
+- ASCE 7-22 ASD (21 combos) for bearing/stability, LRFD (17 combos) for structural design
+
+All modules use CLI with JSON-in/JSON-out.
 
 ### Quick Start
 
@@ -38,9 +47,12 @@ echo '{"module":"wood_beam","span_ft":12,"material":{"type":"sawn_lumber","speci
 
 # Wood column
 echo '{"module":"wood_column","height_ft":10,"width_in":5.5,"depth_in":5.5,"material":{"type":"sawn_lumber","species":"DF-L","grade":"No.2"},"axial_dead_lb":5000,"axial_live_lb":10000}' | zig-out/bin/zenercalc
+
+# Spread footing
+echo '{"module":"spread_footing","length_ft":8,"width_ft":8,"thickness_in":18,"c1_in":18,"c2_in":18,"concrete_strength":"4000","rebar_grade":"60","bar_size":"#5","axial_dead_lb":80000,"axial_live_lb":60000,"allowable_bearing_psf":3000}' | zig-out/bin/zenercalc
 ```
 
-Output is pretty-printed JSON with section properties, NDS adjustment factors, actual stresses, and pass/fail status for each design check.
+Output is pretty-printed JSON with design properties, adjustment factors, actual stresses, and pass/fail status for each design check.
 
 ---
 
@@ -96,9 +108,9 @@ zig build -Dtarget=aarch64-windows-gnu
 | Standard | Implemented | Default Target |
 |---|---|---|
 | NDS | 2018 | 2024 |
-| ASCE 7 | 22 (ASD combos) | 22 |
+| ASCE 7 | 22 (ASD + LRFD combos) | 22 |
 | IBC | -- | 2024 |
-| ACI 318 | -- | 19 |
+| ACI 318 | 19 | 19 |
 | AISC 360 | -- | 22 |
 | SDPWS | -- | 2021 |
 | TMS 402/602 | -- | 2022 |
@@ -121,7 +133,7 @@ Future phases will add C dependencies (SQLite, GLFW, FreeType, libharu) compiled
 
 ### Beams
 - Steel beam (AISC 360)
-- Wood beam (NDS) ← **MVP**
+- Wood beam (NDS) ← **Done**
 - Concrete beam (ACI 318)
 - Masonry beam (TMS 402)
 - Composite beam
@@ -130,13 +142,13 @@ Future phases will add C dependencies (SQLite, GLFW, FreeType, libharu) compiled
 - Torsional beam
 
 ### Columns
-- Wood column (NDS) ← **MVP**
+- Wood column (NDS) ← **Done**
 - Steel column (AISC 360)
 - Concrete column (ACI 318)
 - Masonry column (TMS 402)
 
 ### Foundations
-- Spread footing (ACI 318) ← **MVP**
+- Spread footing (ACI 318) ← **Done**
 - Continuous footing
 - Pile cap
 - Pile design
@@ -197,17 +209,21 @@ zenercalc/
 │   ├── main.zig                  # CLI entry point, JSON-in/JSON-out
 │   ├── engine/
 │   │   ├── math.zig              # section properties, beam solver (51-point)
-│   │   ├── loads.zig             # load types, ASCE 7-22 ASD combinations
+│   │   ├── loads.zig             # load types, ASCE 7-22 ASD + LRFD combinations
 │   │   ├── materials/
-│   │   │   └── wood.zig          # NDS lumber + glulam comptime tables
+│   │   │   ├── wood.zig          # NDS lumber + glulam comptime tables
+│   │   │   └── concrete.zig      # ACI concrete strength, rebar grade/size tables
 │   │   └── codes/
-│   │       └── nds2018.zig       # NDS 2018 adjustment factors + design checks
+│   │       ├── nds2018.zig       # NDS 2018 adjustment factors + design checks
+│   │       └── aci318.zig        # ACI 318-19 shear, flexure, development length
 │   └── modules/
 │       ├── wood_beam.zig         # Inputs/Outputs/compute() for wood beams
-│       └── wood_column.zig       # Inputs/Outputs/compute() for wood columns
+│       ├── wood_column.zig       # Inputs/Outputs/compute() for wood columns
+│       └── spread_footing.zig    # Inputs/Outputs/compute() for spread footings
 ├── data/
 │   ├── nds_lumber_2018.json      # NDS Table 4A audit trail (5 species x 4 grades)
-│   └── nds_glulam_2018.json      # NDS Table 5A/5B audit trail (7 stress classes)
+│   ├── nds_glulam_2018.json      # NDS Table 5A/5B audit trail (7 stress classes)
+│   └── aci_rebar_2019.json       # ASTM A615 rebar audit trail (9 bar sizes)
 ├── tests/
 │   └── conformance/
 │       └── wood_beam_enercalc.json  # ENERCALC reference fixtures

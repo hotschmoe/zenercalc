@@ -133,7 +133,7 @@ we love you, Claude! do your best today
 
 ## Project Overview
 
-ZenerCalc is a structural engineering calculation tool written in Zig, aiming for feature parity with ENERCALC SEL 20 (64 calculation modules). Phase 1 complete (wood beam + wood column). Licensed AGPL-3.0.
+ZenerCalc is a structural engineering calculation tool written in Zig, aiming for feature parity with ENERCALC SEL 20 (64 calculation modules). Phase 2 complete (wood beam + wood column + spread footing). Licensed AGPL-3.0.
 
 ## Build Commands
 
@@ -163,11 +163,14 @@ zig-out/bin/zenercalc input.json                              # file arg
 - **src/root.zig** -- Library root, re-exports engine modules as `zenercalc` package
 - **src/main.zig** -- CLI entry point: module dispatch, JSON parse -> compute -> JSON output
 - **src/engine/math.zig** -- RectSection (strong + weak axis, radius of gyration), Load union, analyzeSimpleBeam (51-point sweep)
-- **src/engine/loads.zig** -- LoadType, LoadCase, 21 ASCE 7-22 ASD combos, governingAsd()
+- **src/engine/loads.zig** -- LoadType, LoadCase, 21 ASD + 17 LRFD combos, governing/minimum for both
 - **src/engine/materials/wood.zig** -- Species/Grade enums, comptime lumber (20) + glulam (7) tables, ReferenceProps, WoodMaterial union
+- **src/engine/materials/concrete.zig** -- ConcreteStrength/Type, RebarGrade, BarSize enums, comptime bar_table (9 entries)
 - **src/engine/codes/nds2018.zig** -- NDS beam factors + adjustedValues(), Cp column stability + columnAdjustedValues(), effectiveLength()
+- **src/engine/codes/aci318.zig** -- ACI 318-19 one-way/two-way shear, flexural steel, minimum steel, development length
 - **src/modules/wood_beam.zig** -- Inputs/Outputs structs, compute() orchestrating full beam design check
 - **src/modules/wood_column.zig** -- Inputs/Outputs structs, compute() with NDS 3.7 Cp and 3.9-3 interaction equation
+- **src/modules/spread_footing.zig** -- Inputs/Outputs structs, compute() with bearing, shear, flexure, development, stability
 - **data/*.json** -- Audit trail copies of material data (runtime uses comptime Zig constants)
 - **build.zig** -- Build system with two test executables: `mod_tests` (from root.zig) and `exe_tests` (from main.zig)
 
@@ -182,23 +185,24 @@ Each calculation module is self-contained with:
 
 - **Auditable by design**: Every formula cites its exact code section (e.g., NDS 2018 Table 4A, NDS 2018 Eq. 3.3-6)
 - **No allocator in compute path**: Inputs/Outputs are flat structs with fixed-size arrays
-- **Comptime material lookup**: 20 lumber + 7 glulam entries as Zig const arrays
+- **Comptime material lookup**: 20 lumber + 7 glulam + 9 rebar entries as Zig const arrays
 - **Single binary**: Native cross-compile per target, no installers or DLLs
 - **Multi-edition ready**: nds2018.zig / nds2024.zig with identical function signatures
 
 ## Code Editions
 
-Currently implemented: NDS 2018, ASCE 7-22 (ASD combos).
+Currently implemented: NDS 2018, ACI 318-19, ASCE 7-22 (ASD + LRFD combos).
 
 Target editions: IBC 2024, ASCE 7-22, ACI 318-19, AISC 360-22, NDS 2024, SDPWS 2021, TMS 402/602 2022.
 
 ## Dependencies
 
-Phase 1: Zero external dependencies. Pure Zig computation + std.json for CLI I/O.
+Phase 2: Zero external dependencies. Pure Zig computation + std.json for CLI I/O.
 
 ## Testing Strategy
 
 - Unit tests against textbook solutions (wL^2/8, PL/4, 5wL^4/384EI)
 - NDS factor tests against stratify reference implementation values
+- ACI shear/flexure tests against hand calculations
 - Conformance fixtures for cross-validation against ENERCALC (tests/conformance/)
 - Target: >95% formula coverage
