@@ -133,13 +133,12 @@ we love you, Claude! do your best today
 
 ## Project Overview
 
-ZenerCalc is a structural engineering calculation tool written in Zig, aiming for feature parity with ENERCALC SEL 20 (64 calculation modules). Currently in Phase 0 (bootstrap). Licensed AGPL-3.0.
+ZenerCalc is a structural engineering calculation tool written in Zig, aiming for feature parity with ENERCALC SEL 20 (64 calculation modules). Currently in Phase 1 (wood beam MVP). Licensed AGPL-3.0.
 
 ## Build Commands
 
 ```bash
 zig build                         # Build for host platform (default: install to zig-out/)
-zig build run                     # Compile and run the executable
 zig build test                    # Run all tests (module + exe test executables)
 zig build -Doptimize=ReleaseFast  # Optimized build
 
@@ -152,42 +151,53 @@ zig build -Dtarget=aarch64-windows-gnu
 
 Requires Zig 0.15.2 (minimum).
 
+### CLI Usage
+
+```bash
+echo '{"module":"wood_beam",...}' | zig-out/bin/zenercalc    # stdin
+zig-out/bin/zenercalc input.json                              # file arg
+```
+
 ## Architecture
 
-- **src/root.zig** -- Library root, exposed as the `zenercalc` module
-- **src/main.zig** -- Binary entry point, imports the `zenercalc` module
+- **src/root.zig** -- Library root, re-exports engine modules as `zenercalc` package
+- **src/main.zig** -- CLI entry point: JSON parse -> compute -> JSON output
+- **src/engine/math.zig** -- RectSection, Load union, analyzeSimpleBeam (51-point sweep)
+- **src/engine/loads.zig** -- LoadType, LoadCase, 21 ASCE 7-22 ASD combos, governingAsd()
+- **src/engine/materials/wood.zig** -- Species/Grade enums, comptime lumber (20) + glulam (7) tables
+- **src/engine/codes/nds2018.zig** -- All 8 NDS factors, adjustedValues(), effectiveLength()
+- **src/modules/wood_beam.zig** -- Inputs/Outputs structs, compute() orchestrating full design check
+- **data/*.json** -- Audit trail copies of material data (runtime uses comptime Zig constants)
 - **build.zig** -- Build system with two test executables: `mod_tests` (from root.zig) and `exe_tests` (from main.zig)
 
-### Planned Module Pattern (Phase 1+)
+### Module Pattern
 
 Each calculation module is self-contained with:
-- `Inputs` struct (serialized to SQLite)
-- `Outputs` struct (cached, recomputed on change)
-- `compute()` method with code section citations
+- `Inputs` struct (all scalar/enum fields, no allocator needed)
+- `Outputs` struct (flat struct with fixed-size diagram arrays)
+- `compute()` function with code section citations
 
 ### Key Architectural Decisions
 
-- **Auditable by design**: Every formula must cite its exact code section (e.g., `// NDS 2024 Table 4A`, `// ACI 318 S22.5.4.1`)
-- **Dependency sovereignty**: C deps (GLFW, FreeType, libharu) have Zig rewrite timelines; SQLite is permanent
-- **Material databases**: Baked at comptime via `@embedFile` + `std.json.parseFromSlice` -- zero runtime file I/O
+- **Auditable by design**: Every formula cites its exact code section (e.g., NDS 2018 Table 4A, NDS 2018 Eq. 3.3-6)
+- **No allocator in compute path**: Inputs/Outputs are flat structs with fixed-size arrays
+- **Comptime material lookup**: 20 lumber + 7 glulam entries as Zig const arrays
 - **Single binary**: Native cross-compile per target, no installers or DLLs
-- **Project format**: SQLite database with `.zenercalc` extension
-
-### UI Architecture (Planned)
-
-Immediate-mode Vulkan rendering, instanced quad rendering for tables, SDF text atlas, keyboard-first navigation. Print-accurate scaling (on-screen = PDF at 72 DPI).
+- **Multi-edition ready**: nds2018.zig / nds2024.zig with identical function signatures
 
 ## Code Editions
 
-Runtime-switchable building code standards: IBC 2024, ASCE 7-22, ACI 318-19, AISC 360-22, NDS 2024, SDPWS 2021, TMS 402/602 2022.
+Currently implemented: NDS 2018, ASCE 7-22 (ASD combos).
+
+Target editions: IBC 2024, ASCE 7-22, ACI 318-19, AISC 360-22, NDS 2024, SDPWS 2021, TMS 402/602 2022.
 
 ## Dependencies
 
-All C dependencies are compiled from source (no system libraries). Zig dependencies (vulkan-zig, zqlite) are forks. See SPEC.md for full dependency analysis and rewrite timelines.
+Phase 1: Zero external dependencies. Pure Zig computation + std.json for CLI I/O.
 
 ## Testing Strategy
 
-- Unit tests against textbook solutions
-- Code example tests from published worked examples (ACI, AISC, AWC, ASCE)
-- Cross-validation against ENERCALC on identical inputs
+- Unit tests against textbook solutions (wL^2/8, PL/4, 5wL^4/384EI)
+- NDS factor tests against stratify reference implementation values
+- Conformance fixtures for cross-validation against ENERCALC (tests/conformance/)
 - Target: >95% formula coverage
