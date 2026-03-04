@@ -1,0 +1,16 @@
+{
+  "source": "ASTM A615 / ACI 318-19 -- Standard Reinforcing Bar Sizes",
+  "edition_year": 2019,
+  "notes": "Standard deformed bars per ASTM A615. Diameters and areas in inches/in2. Weights in lb/ft.",
+  "entries": [
+    { "size": "#3",  "diameter": 0.375, "area": 0.11, "weight_plf": 0.376 },
+    { "size": "#4",  "diameter": 0.500, "area": 0.20, "weight_plf": 0.668 },
+    { "size": "#5",  "diameter": 0.625, "area": 0.31, "weight_plf": 1.043 },
+    { "size": "#6",  "diameter": 0.750, "area": 0.44, "weight_plf": 1.502 },
+    { "size": "#7",  "diameter": 0.875, "area": 0.60, "weight_plf": 2.044 },
+    { "size": "#8",  "diameter": 1.000, "area": 0.79, "weight_plf": 2.670 },
+    { "size": "#9",  "diameter": 1.128, "area": 1.00, "weight_plf": 3.400 },
+    { "size": "#10", "diameter": 1.270, "area": 1.27, "weight_plf": 4.303 },
+    { "size": "#11", "diameter": 1.410, "area": 1.56, "weight_plf": 5.313 }
+  ]
+}

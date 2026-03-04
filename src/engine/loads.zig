@@ -113,6 +113,62 @@ pub fn minimumAsd(case: LoadCase) GoverningResult {
     return .{ .combo_name = min_name, .total = min_total, .index = min_idx };
 }
 
+// ASCE 7-22 Section 2.3.1 LRFD Load Combinations
+
+pub const lrfd_combinations = [_]LoadCombo{
+    combo("LRFD-1", "1.4D", F{ 1.4, 0, 0, 0, 0, 0, 0 }),
+    combo("LRFD-2", "1.2D + 1.6L + 0.5Lr", F{ 1.2, 1.6, 0.5, 0, 0, 0, 0 }),
+    combo("LRFD-2a", "1.2D + 1.6L + 0.5S", F{ 1.2, 1.6, 0, 0.5, 0, 0, 0 }),
+    combo("LRFD-2b", "1.2D + 1.6L + 0.5R", F{ 1.2, 1.6, 0, 0, 0.5, 0, 0 }),
+    combo("LRFD-3", "1.2D + 1.6Lr + L", F{ 1.2, 1.0, 1.6, 0, 0, 0, 0 }),
+    combo("LRFD-3a", "1.2D + 1.6S + L", F{ 1.2, 1.0, 0, 1.6, 0, 0, 0 }),
+    combo("LRFD-3b", "1.2D + 1.6R + L", F{ 1.2, 1.0, 0, 0, 1.6, 0, 0 }),
+    combo("LRFD-3c", "1.2D + 1.6Lr + 0.5W", F{ 1.2, 0, 1.6, 0, 0, 0.5, 0 }),
+    combo("LRFD-3d", "1.2D + 1.6S + 0.5W", F{ 1.2, 0, 0, 1.6, 0, 0.5, 0 }),
+    combo("LRFD-3e", "1.2D + 1.6R + 0.5W", F{ 1.2, 0, 0, 0, 1.6, 0.5, 0 }),
+    combo("LRFD-4", "1.2D + 1.0W + L + 0.5Lr", F{ 1.2, 1.0, 0.5, 0, 0, 1.0, 0 }),
+    combo("LRFD-4a", "1.2D + 1.0W + L + 0.5S", F{ 1.2, 1.0, 0, 0.5, 0, 1.0, 0 }),
+    combo("LRFD-4b", "1.2D + 1.0W + L + 0.5R", F{ 1.2, 1.0, 0, 0, 0.5, 1.0, 0 }),
+    combo("LRFD-5", "1.2D + 1.0E + L + 0.2S", F{ 1.2, 1.0, 0, 0.2, 0, 0, 1.0 }),
+    combo("LRFD-6", "0.9D + 1.0W", F{ 0.9, 0, 0, 0, 0, 1.0, 0 }),
+    combo("LRFD-6'", "0.9D - 1.0W", F{ 0.9, 0, 0, 0, 0, -1.0, 0 }),
+    combo("LRFD-7", "0.9D + 1.0E", F{ 0.9, 0, 0, 0, 0, 0, 1.0 }),
+};
+
+pub fn governingLrfd(case: LoadCase) GoverningResult {
+    var max_total: f64 = -std.math.inf(f64);
+    var max_name: []const u8 = "";
+    var max_idx: usize = 0;
+
+    for (lrfd_combinations, 0..) |c, i| {
+        const total = c.apply(case);
+        if (total > max_total) {
+            max_total = total;
+            max_name = c.name;
+            max_idx = i;
+        }
+    }
+
+    return .{ .combo_name = max_name, .total = max_total, .index = max_idx };
+}
+
+pub fn minimumLrfd(case: LoadCase) GoverningResult {
+    var min_total: f64 = std.math.inf(f64);
+    var min_name: []const u8 = "";
+    var min_idx: usize = 0;
+
+    for (lrfd_combinations, 0..) |c, i| {
+        const total = c.apply(case);
+        if (total < min_total) {
+            min_total = total;
+            min_name = c.name;
+            min_idx = i;
+        }
+    }
+
+    return .{ .combo_name = min_name, .total = min_total, .index = min_idx };
+}
+
 // Determine load duration from governing combo's load types.
 // Returns the shortest-duration load type present with nonzero factor.
 pub fn governingLoadDuration(combo_idx: usize, case: LoadCase) LoadDuration {
@@ -171,6 +227,30 @@ test "ASD-8' uplift" {
     // 0.6*150 - 0.6*200 = 90 - 120 = -30
     try std.testing.expectApproxEqAbs(min.total, -30.0, 0.001);
     try std.testing.expectEqualStrings("ASD-8'", min.combo_name);
+}
+
+test "LRFD combo count" {
+    try std.testing.expectEqual(@as(usize, 17), lrfd_combinations.len);
+}
+
+test "LRFD-2 1.2D + 1.6L" {
+    var case = LoadCase{};
+    case.set(.dead, 100);
+    case.set(.live, 200);
+    // LRFD-2: 1.2*100 + 1.6*200 = 120 + 320 = 440
+    const gov = governingLrfd(case);
+    try std.testing.expectApproxEqAbs(gov.total, 440.0, 0.001);
+    try std.testing.expectEqualStrings("LRFD-2", gov.combo_name);
+}
+
+test "LRFD-6' uplift" {
+    var case = LoadCase{};
+    case.set(.dead, 100);
+    case.set(.wind, 200);
+    const min = minimumLrfd(case);
+    // LRFD-6': 0.9*100 - 1.0*200 = 90 - 200 = -110
+    try std.testing.expectApproxEqAbs(min.total, -110.0, 0.001);
+    try std.testing.expectEqualStrings("LRFD-6'", min.combo_name);
 }
 
 test "load duration from governing combo" {

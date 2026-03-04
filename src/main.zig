@@ -3,9 +3,12 @@ const zenercalc = @import("zenercalc");
 
 const wood_beam = zenercalc.wood_beam;
 const wood_column = zenercalc.wood_column;
+const spread_footing = zenercalc.spread_footing;
 const wood = zenercalc.wood;
+const concrete = zenercalc.concrete;
 const loads = zenercalc.loads;
 const nds2018 = zenercalc.nds2018;
+const aci318 = zenercalc.aci318;
 
 pub fn main() !void {
     var gpa_impl: std.heap.GeneralPurposeAllocator(.{}) = .init;
@@ -36,6 +39,16 @@ pub fn main() !void {
             return;
         };
         try writeColumnOutputs(inputs, outputs);
+    } else if (std.mem.eql(u8, module_name, "spread_footing")) {
+        const inputs = parseFootingInputs(input_bytes) catch |err| {
+            try writeError(err);
+            return;
+        };
+        const outputs = spread_footing.compute(inputs) catch |err| {
+            try writeError(err);
+            return;
+        };
+        try writeFootingOutputs(outputs);
     } else {
         const inputs = parseInputs(input_bytes) catch |err| {
             try writeError(err);
@@ -56,6 +69,13 @@ const ParseError = error{
     UnknownGrade,
     UnknownStressClass,
     UnknownMaterial,
+    UnknownConcreteStrength,
+    UnknownConcreteType,
+    UnknownRebarGrade,
+    UnknownBarSize,
+    UnknownFootingShape,
+    UnknownColumnShape,
+    UnknownColumnPosition,
 };
 
 fn detectModule(bytes: []const u8) ParseError![]const u8 {
@@ -67,6 +87,7 @@ fn detectModule(bytes: []const u8) ParseError![]const u8 {
         if (m == .string) {
             if (std.mem.eql(u8, m.string, "wood_beam")) return "wood_beam";
             if (std.mem.eql(u8, m.string, "wood_column")) return "wood_column";
+            if (std.mem.eql(u8, m.string, "spread_footing")) return "spread_footing";
             return error.UnsupportedModule;
         }
     }
@@ -537,6 +558,288 @@ fn writeOutputs(inputs: wood_beam.Inputs, out: wood_beam.Outputs) !void {
         inputs.deflection_limit_tl,
         out.dcr_deflection_tl,
         if (out.deflection_tl_status == .pass) "pass" else "fail",
+    });
+
+    try w.flush();
+}
+
+// -- Spread Footing Parsing -----------------------------------------------
+
+fn parseConcreteStrength(s: []const u8) ?concrete.ConcreteStrength {
+    if (std.mem.eql(u8, s, "3000")) return .fc_3000;
+    if (std.mem.eql(u8, s, "4000")) return .fc_4000;
+    if (std.mem.eql(u8, s, "5000")) return .fc_5000;
+    if (std.mem.eql(u8, s, "6000")) return .fc_6000;
+    return null;
+}
+
+fn parseConcreteType(s: []const u8) ?concrete.ConcreteType {
+    if (std.mem.eql(u8, s, "normal_weight") or std.mem.eql(u8, s, "NW")) return .normal_weight;
+    if (std.mem.eql(u8, s, "sand_lightweight") or std.mem.eql(u8, s, "SLW")) return .sand_lightweight;
+    if (std.mem.eql(u8, s, "all_lightweight") or std.mem.eql(u8, s, "ALW")) return .all_lightweight;
+    return null;
+}
+
+fn parseRebarGrade(s: []const u8) ?concrete.RebarGrade {
+    if (std.mem.eql(u8, s, "40")) return .grade_40;
+    if (std.mem.eql(u8, s, "60")) return .grade_60;
+    if (std.mem.eql(u8, s, "80")) return .grade_80;
+    return null;
+}
+
+fn parseBarSize(s: []const u8) ?concrete.BarSize {
+    if (std.mem.eql(u8, s, "#3") or std.mem.eql(u8, s, "3")) return .no3;
+    if (std.mem.eql(u8, s, "#4") or std.mem.eql(u8, s, "4")) return .no4;
+    if (std.mem.eql(u8, s, "#5") or std.mem.eql(u8, s, "5")) return .no5;
+    if (std.mem.eql(u8, s, "#6") or std.mem.eql(u8, s, "6")) return .no6;
+    if (std.mem.eql(u8, s, "#7") or std.mem.eql(u8, s, "7")) return .no7;
+    if (std.mem.eql(u8, s, "#8") or std.mem.eql(u8, s, "8")) return .no8;
+    if (std.mem.eql(u8, s, "#9") or std.mem.eql(u8, s, "9")) return .no9;
+    if (std.mem.eql(u8, s, "#10") or std.mem.eql(u8, s, "10")) return .no10;
+    if (std.mem.eql(u8, s, "#11") or std.mem.eql(u8, s, "11")) return .no11;
+    return null;
+}
+
+fn parseFootingShape(s: []const u8) ?spread_footing.FootingShape {
+    if (std.mem.eql(u8, s, "square")) return .square;
+    if (std.mem.eql(u8, s, "rectangular")) return .rectangular;
+    if (std.mem.eql(u8, s, "circular")) return .circular;
+    return null;
+}
+
+fn parseColumnShape(s: []const u8) ?spread_footing.ColumnShape {
+    if (std.mem.eql(u8, s, "square")) return .square;
+    if (std.mem.eql(u8, s, "rectangular")) return .rectangular;
+    if (std.mem.eql(u8, s, "circular")) return .circular;
+    return null;
+}
+
+fn parseColumnPosition(s: []const u8) ?aci318.ColumnPosition {
+    if (std.mem.eql(u8, s, "interior")) return .interior;
+    if (std.mem.eql(u8, s, "edge")) return .edge;
+    if (std.mem.eql(u8, s, "corner")) return .corner;
+    return null;
+}
+
+fn parseFootingInputs(bytes: []const u8) ParseError!spread_footing.Inputs {
+    const parsed = std.json.parseFromSlice(std.json.Value, std.heap.page_allocator, bytes, .{}) catch
+        return error.InvalidJson;
+    defer parsed.deinit();
+
+    const root = parsed.value.object;
+
+    var inp = spread_footing.Inputs{
+        .length_ft = getFloat(root, "length_ft") orelse 0,
+        .width_ft = getFloat(root, "width_ft") orelse 0,
+        .thickness_in = getFloat(root, "thickness_in") orelse 18.0,
+        .cover_in = getFloat(root, "cover_in") orelse 3.0,
+        .c1_in = getFloat(root, "c1_in") orelse 18.0,
+        .c2_in = getFloat(root, "c2_in") orelse 18.0,
+        .axial_dead_lb = getFloat(root, "axial_dead_lb") orelse 0,
+        .axial_live_lb = getFloat(root, "axial_live_lb") orelse 0,
+        .axial_snow_lb = getFloat(root, "axial_snow_lb") orelse 0,
+        .axial_wind_lb = getFloat(root, "axial_wind_lb") orelse 0,
+        .axial_seismic_lb = getFloat(root, "axial_seismic_lb") orelse 0,
+        .moment_x_dead_ft_lb = getFloat(root, "moment_x_dead_ft_lb") orelse 0,
+        .moment_x_live_ft_lb = getFloat(root, "moment_x_live_ft_lb") orelse 0,
+        .moment_x_wind_ft_lb = getFloat(root, "moment_x_wind_ft_lb") orelse 0,
+        .moment_x_seismic_ft_lb = getFloat(root, "moment_x_seismic_ft_lb") orelse 0,
+        .moment_y_dead_ft_lb = getFloat(root, "moment_y_dead_ft_lb") orelse 0,
+        .moment_y_live_ft_lb = getFloat(root, "moment_y_live_ft_lb") orelse 0,
+        .moment_y_wind_ft_lb = getFloat(root, "moment_y_wind_ft_lb") orelse 0,
+        .moment_y_seismic_ft_lb = getFloat(root, "moment_y_seismic_ft_lb") orelse 0,
+        .shear_x_dead_lb = getFloat(root, "shear_x_dead_lb") orelse 0,
+        .shear_x_live_lb = getFloat(root, "shear_x_live_lb") orelse 0,
+        .shear_x_wind_lb = getFloat(root, "shear_x_wind_lb") orelse 0,
+        .shear_x_seismic_lb = getFloat(root, "shear_x_seismic_lb") orelse 0,
+        .shear_y_dead_lb = getFloat(root, "shear_y_dead_lb") orelse 0,
+        .shear_y_live_lb = getFloat(root, "shear_y_live_lb") orelse 0,
+        .shear_y_wind_lb = getFloat(root, "shear_y_wind_lb") orelse 0,
+        .shear_y_seismic_lb = getFloat(root, "shear_y_seismic_lb") orelse 0,
+        .allowable_bearing_psf = getFloat(root, "allowable_bearing_psf") orelse 3000,
+        .friction_coeff = getFloat(root, "friction_coeff") orelse 0.40,
+        .soil_unit_weight_pcf = getFloat(root, "soil_unit_weight_pcf") orelse 110,
+        .depth_to_bottom_ft = getFloat(root, "depth_to_bottom_ft") orelse 4.0,
+    };
+
+    if (getFloat(root, "overturning_fs")) |v| inp.overturning_fs = v;
+    if (getFloat(root, "sliding_fs")) |v| inp.sliding_fs = v;
+    if (root.get("include_self_weight")) |v| {
+        if (v == .bool) inp.include_self_weight = v.bool;
+    }
+    if (getString(root, "footing_shape")) |s| {
+        inp.footing_shape = parseFootingShape(s) orelse return error.UnknownFootingShape;
+    }
+    if (getString(root, "column_shape")) |s| {
+        inp.column_shape = parseColumnShape(s) orelse return error.UnknownColumnShape;
+    }
+    if (getString(root, "column_position")) |s| {
+        inp.column_position = parseColumnPosition(s) orelse return error.UnknownColumnPosition;
+    }
+    if (getString(root, "concrete_strength")) |s| {
+        inp.concrete_strength = parseConcreteStrength(s) orelse return error.UnknownConcreteStrength;
+    }
+    if (getString(root, "concrete_type")) |s| {
+        inp.concrete_type = parseConcreteType(s) orelse return error.UnknownConcreteType;
+    }
+    if (getString(root, "rebar_grade")) |s| {
+        inp.rebar_grade = parseRebarGrade(s) orelse return error.UnknownRebarGrade;
+    }
+    if (getString(root, "bar_size")) |s| {
+        inp.bar_size = parseBarSize(s) orelse return error.UnknownBarSize;
+    }
+
+    return inp;
+}
+
+fn statusStr(s: spread_footing.CheckStatus) []const u8 {
+    return if (s == .pass) "pass" else "fail";
+}
+
+fn writeFootingOutputs(out: spread_footing.Outputs) !void {
+    var stdout_buffer: [32768]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const w = &stdout_writer.interface;
+
+    try w.print(
+        \\{{
+        \\  "module": "spread_footing",
+        \\  "status": "{s}",
+        \\  "geometry": {{
+        \\    "footing_area_sf": {d:.2},
+        \\    "effective_depth_in": {d:.4},
+        \\    "self_weight_lb": {d:.1},
+        \\    "overburden_lb": {d:.1}
+        \\  }},
+        \\  "bearing": {{
+        \\    "service_axial_lb": {d:.1},
+        \\    "q_max_psf": {d:.1},
+        \\    "q_min_psf": {d:.1},
+        \\    "eccentricity_x_in": {d:.3},
+        \\    "eccentricity_y_in": {d:.3},
+        \\    "kern_exceeded": {s},
+        \\    "dcr": {d:.3},
+        \\    "governing_combo": "{s}",
+        \\    "status": "{s}"
+        \\  }},
+        \\
+    , .{
+        statusStr(out.overall_status),
+        out.footing_area_sf,
+        out.effective_depth_in,
+        out.self_weight_lb,
+        out.overburden_lb,
+        out.service_axial_lb,
+        out.q_max_psf,
+        out.q_min_psf,
+        out.eccentricity_x_in,
+        out.eccentricity_y_in,
+        if (out.kern_exceeded) "true" else "false",
+        out.bearing_dcr,
+        out.bearing_combo_name[0..out.bearing_combo_len],
+        statusStr(out.bearing_status),
+    });
+
+    try w.print(
+        \\  "one_way_shear": {{
+        \\    "Vu_L_lb": {d:.1},
+        \\    "Vu_B_lb": {d:.1},
+        \\    "phi_Vc_L_lb": {d:.1},
+        \\    "phi_Vc_B_lb": {d:.1},
+        \\    "dcr": {d:.3},
+        \\    "governing_combo": "{s}",
+        \\    "status": "{s}"
+        \\  }},
+        \\  "two_way_shear": {{
+        \\    "Vu_lb": {d:.1},
+        \\    "bo_in": {d:.2},
+        \\    "phi_Vc_lb": {d:.1},
+        \\    "Vc1_lb": {d:.1},
+        \\    "Vc2_lb": {d:.1},
+        \\    "Vc3_lb": {d:.1},
+        \\    "governing_eq": {d},
+        \\    "dcr": {d:.3},
+        \\    "governing_combo": "{s}",
+        \\    "status": "{s}"
+        \\  }},
+        \\
+    , .{
+        out.vu_one_way_l_lb,
+        out.vu_one_way_b_lb,
+        out.phi_vc_one_way_l_lb,
+        out.phi_vc_one_way_b_lb,
+        out.one_way_shear_dcr,
+        out.one_way_combo_name[0..out.one_way_combo_len],
+        statusStr(out.one_way_shear_status),
+        out.vu_two_way_lb,
+        out.bo_in,
+        out.phi_vc_two_way_lb,
+        out.vc1_lb,
+        out.vc2_lb,
+        out.vc3_lb,
+        out.governing_vc_eq,
+        out.two_way_shear_dcr,
+        out.two_way_combo_name[0..out.two_way_combo_len],
+        statusStr(out.two_way_shear_status),
+    });
+
+    try w.print(
+        \\  "flexure": {{
+        \\    "Mu_L_ft_lb": {d:.1},
+        \\    "Mu_B_ft_lb": {d:.1},
+        \\    "As_required_in2_per_ft": {d:.4},
+        \\    "As_min_in2_per_ft": {d:.4},
+        \\    "As_provided_in2_per_ft": {d:.4},
+        \\    "bar_spacing_in": {d:.1},
+        \\    "phi_Mn_ft_lb": {d:.1},
+        \\    "dcr": {d:.3},
+        \\    "governing_combo": "{s}",
+        \\    "status": "{s}"
+        \\  }},
+        \\  "development": {{
+        \\    "ld_required_in": {d:.2},
+        \\    "ld_available_in": {d:.2},
+        \\    "dcr": {d:.3},
+        \\    "status": "{s}"
+        \\  }},
+        \\
+    , .{
+        out.mu_l_ft_lb,
+        out.mu_b_ft_lb,
+        out.as_required_in2_per_ft,
+        out.as_min_in2_per_ft,
+        out.as_provided_in2_per_ft,
+        out.bar_spacing_in,
+        out.phi_mn_ft_lb,
+        out.flexure_dcr,
+        out.flexure_combo_name[0..out.flexure_combo_len],
+        statusStr(out.flexure_status),
+        out.ld_required_in,
+        out.ld_available_in,
+        out.development_dcr,
+        statusStr(out.development_status),
+    });
+
+    // Cap infinite FS values for valid JSON (inf = no driving force)
+    const cap = 9999.0;
+    try w.print(
+        \\  "stability": {{
+        \\    "overturning_fs_x": {d:.2},
+        \\    "overturning_fs_y": {d:.2},
+        \\    "sliding_fs_x": {d:.2},
+        \\    "sliding_fs_y": {d:.2},
+        \\    "overturning_status": "{s}",
+        \\    "sliding_status": "{s}"
+        \\  }}
+        \\}}
+        \\
+    , .{
+        @min(out.overturning_fs_x, cap),
+        @min(out.overturning_fs_y, cap),
+        @min(out.sliding_fs_x, cap),
+        @min(out.sliding_fs_y, cap),
+        statusStr(out.overturning_status),
+        statusStr(out.sliding_status),
     });
 
     try w.flush();
