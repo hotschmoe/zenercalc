@@ -1,0 +1,80 @@
+{
+  "description": "ENERCALC SEL 20 reference values for wood beam cross-validation",
+  "notes": "Values to be populated from manual ENERCALC runs. Tolerance: 2%.",
+  "cases": [
+    {
+      "name": "2x10 DF-L No.2 floor joist",
+      "inputs": {
+        "module": "wood_beam",
+        "span_ft": 12,
+        "material": { "type": "sawn_lumber", "species": "DF-L", "grade": "No.2" },
+        "width_in": 1.5,
+        "depth_in": 9.25,
+        "dead_load_plf": 15,
+        "live_load_plf": 40,
+        "include_self_weight": true,
+        "moisture": "dry",
+        "temperature": "normal",
+        "incising": "none",
+        "repetitive": "repetitive",
+        "compression_edge_braced": true,
+        "deflection_limit_ll": 360,
+        "deflection_limit_tl": 240
+      },
+      "expected": {
+        "fb_prime_psi_approx": 1138.5,
+        "fv_prime_psi_approx": 180.0,
+        "status": "pass",
+        "notes": "Typical residential floor joist at 16\" OC"
+      }
+    },
+    {
+      "name": "2x12 DF-L SS header beam",
+      "inputs": {
+        "module": "wood_beam",
+        "span_ft": 8,
+        "material": { "type": "sawn_lumber", "species": "DF-L", "grade": "SS" },
+        "width_in": 3.0,
+        "depth_in": 11.25,
+        "dead_load_plf": 200,
+        "live_load_plf": 400,
+        "include_self_weight": true,
+        "moisture": "dry",
+        "temperature": "normal",
+        "incising": "none",
+        "repetitive": "single",
+        "compression_edge_braced": true,
+        "deflection_limit_ll": 360,
+        "deflection_limit_tl": 240
+      },
+      "expected": {
+        "fb_prime_psi_approx": 1500.0,
+        "notes": "Double 2x12 header (modeled as 3\" wide)"
+      }
+    },
+    {
+      "name": "24F-1.8E glulam beam",
+      "inputs": {
+        "module": "wood_beam",
+        "span_ft": 20,
+        "material": { "type": "glulam", "stress_class": "24F-1.8E" },
+        "width_in": 5.125,
+        "depth_in": 12.0,
+        "dead_load_plf": 200,
+        "live_load_plf": 600,
+        "include_self_weight": true,
+        "moisture": "dry",
+        "temperature": "normal",
+        "incising": "none",
+        "repetitive": "single",
+        "compression_edge_braced": true,
+        "deflection_limit_ll": 360,
+        "deflection_limit_tl": 240
+      },
+      "expected": {
+        "fb_prime_psi_approx": 2400.0,
+        "notes": "Common glulam beam for residential garage or commercial"
+      }
+    }
+  ]
+}

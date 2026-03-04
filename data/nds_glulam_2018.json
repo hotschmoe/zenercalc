@@ -1,0 +1,14 @@
+{
+  "source": "NDS Supplement Table 5A/5B - Glulam Reference Design Values",
+  "edition_year": 2018,
+  "notes": "Structural Glued Laminated Timber. All values in psi. Fb has separate pos/neg for unbalanced layups.",
+  "entries": [
+    { "stress_class": "16F-1.3E", "fb_pos": 1600, "fb_neg": 1600, "ft": 800,  "fv": 265, "fc_perp": 560, "fc": 1400, "e": 1300000, "e_min": 685000,  "sg": 0.50, "balanced": true },
+    { "stress_class": "20F-1.5E", "fb_pos": 2000, "fb_neg": 2000, "ft": 1000, "fv": 265, "fc_perp": 560, "fc": 1550, "e": 1500000, "e_min": 790000,  "sg": 0.50, "balanced": true },
+    { "stress_class": "24F-1.7E", "fb_pos": 2400, "fb_neg": 2400, "ft": 1150, "fv": 265, "fc_perp": 650, "fc": 1650, "e": 1700000, "e_min": 895000,  "sg": 0.50, "balanced": true },
+    { "stress_class": "24F-1.8E", "fb_pos": 2400, "fb_neg": 2400, "ft": 1150, "fv": 265, "fc_perp": 650, "fc": 1650, "e": 1800000, "e_min": 950000,  "sg": 0.50, "balanced": true },
+    { "stress_class": "26F-1.9E", "fb_pos": 2600, "fb_neg": 2600, "ft": 1250, "fv": 265, "fc_perp": 650, "fc": 1750, "e": 1900000, "e_min": 1000000, "sg": 0.50, "balanced": true },
+    { "stress_class": "24F-V4",   "fb_pos": 2400, "fb_neg": 1450, "ft": 1100, "fv": 265, "fc_perp": 650, "fc": 1600, "e": 1800000, "e_min": 950000,  "sg": 0.50, "balanced": false },
+    { "stress_class": "24F-V8",   "fb_pos": 2400, "fb_neg": 2400, "ft": 1100, "fv": 265, "fc_perp": 650, "fc": 1600, "e": 1800000, "e_min": 950000,  "sg": 0.50, "balanced": true }
+  ]
+}

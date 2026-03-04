@@ -1,0 +1,31 @@
+{
+  "source": "NDS Supplement Table 4A - Reference Design Values for Visually Graded Dimension Lumber",
+  "edition_year": 2018,
+  "notes": "Dimension lumber 2\"-4\" thick, values for 2x10 and wider. All stresses in psi. E and Emin in psi.",
+  "entries": [
+    { "species": "DF-L", "grade": "SS",  "fb": 1500, "ft": 1000, "fv": 180, "fc_perp": 625, "fc": 1700, "e": 1900000, "e_min": 690000, "sg": 0.50 },
+    { "species": "DF-L", "grade": "No1", "fb": 1200, "ft":  800, "fv": 180, "fc_perp": 625, "fc": 1550, "e": 1700000, "e_min": 620000, "sg": 0.50 },
+    { "species": "DF-L", "grade": "No2", "fb":  900, "ft":  575, "fv": 180, "fc_perp": 625, "fc": 1350, "e": 1600000, "e_min": 580000, "sg": 0.50 },
+    { "species": "DF-L", "grade": "No3", "fb":  525, "ft":  325, "fv": 180, "fc_perp": 625, "fc":  775, "e": 1400000, "e_min": 510000, "sg": 0.50 },
+
+    { "species": "SP",   "grade": "SS",  "fb": 1500, "ft": 1000, "fv": 175, "fc_perp": 565, "fc": 1800, "e": 1800000, "e_min": 660000, "sg": 0.55 },
+    { "species": "SP",   "grade": "No1", "fb": 1250, "ft":  825, "fv": 175, "fc_perp": 565, "fc": 1650, "e": 1700000, "e_min": 620000, "sg": 0.55 },
+    { "species": "SP",   "grade": "No2", "fb":  850, "ft":  550, "fv": 175, "fc_perp": 565, "fc": 1450, "e": 1400000, "e_min": 510000, "sg": 0.55 },
+    { "species": "SP",   "grade": "No3", "fb":  500, "ft":  300, "fv": 175, "fc_perp": 565, "fc":  825, "e": 1200000, "e_min": 440000, "sg": 0.55 },
+
+    { "species": "HF",   "grade": "SS",  "fb": 1400, "ft":  925, "fv": 150, "fc_perp": 405, "fc": 1500, "e": 1600000, "e_min": 580000, "sg": 0.43 },
+    { "species": "HF",   "grade": "No1", "fb": 1100, "ft":  725, "fv": 150, "fc_perp": 405, "fc": 1350, "e": 1500000, "e_min": 550000, "sg": 0.43 },
+    { "species": "HF",   "grade": "No2", "fb":  850, "ft":  525, "fv": 150, "fc_perp": 405, "fc": 1300, "e": 1300000, "e_min": 470000, "sg": 0.43 },
+    { "species": "HF",   "grade": "No3", "fb":  500, "ft":  300, "fv": 150, "fc_perp": 405, "fc":  750, "e": 1200000, "e_min": 440000, "sg": 0.43 },
+
+    { "species": "SPF",  "grade": "SS",  "fb": 1250, "ft":  825, "fv": 135, "fc_perp": 425, "fc": 1400, "e": 1500000, "e_min": 550000, "sg": 0.42 },
+    { "species": "SPF",  "grade": "No1", "fb": 1000, "ft":  650, "fv": 135, "fc_perp": 425, "fc": 1250, "e": 1400000, "e_min": 510000, "sg": 0.42 },
+    { "species": "SPF",  "grade": "No2", "fb":  875, "ft":  450, "fv": 135, "fc_perp": 425, "fc": 1150, "e": 1400000, "e_min": 510000, "sg": 0.42 },
+    { "species": "SPF",  "grade": "No3", "fb":  500, "ft":  250, "fv": 135, "fc_perp": 425, "fc":  650, "e": 1200000, "e_min": 440000, "sg": 0.42 },
+
+    { "species": "DF-S", "grade": "SS",  "fb": 1350, "ft":  900, "fv": 180, "fc_perp": 520, "fc": 1600, "e": 1400000, "e_min": 510000, "sg": 0.46 },
+    { "species": "DF-S", "grade": "No1", "fb": 1050, "ft":  700, "fv": 180, "fc_perp": 520, "fc": 1450, "e": 1200000, "e_min": 440000, "sg": 0.46 },
+    { "species": "DF-S", "grade": "No2", "fb":  875, "ft":  525, "fv": 180, "fc_perp": 520, "fc": 1350, "e": 1100000, "e_min": 400000, "sg": 0.46 },
+    { "species": "DF-S", "grade": "No3", "fb":  500, "ft":  300, "fv": 180, "fc_perp": 520, "fc":  775, "e": 1000000, "e_min": 370000, "sg": 0.46 }
+  ]
+}
