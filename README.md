@@ -8,23 +8,36 @@ Built from scratch in Zig. Zero bloat. Every formula cites its code section. All
 
 ---
 
-## Current Status: Phase 1 MVP
+## Current Status: Phase 1 Complete
 
-The wood beam calculator is implemented and functional:
+Wood beam and wood column calculators are implemented and functional:
 
+**Wood Beam:**
 - NDS 2018 sawn lumber (5 species x 4 grades) and glulam (7 stress classes)
 - All 8 NDS adjustment factors (CD, CM, Ct, CF, Cfu, Ci, Cr, CL) with code citations
 - ASCE 7-22 ASD load combinations (21 combos including wind uplift)
 - Simple beam analysis with moment, shear, and deflection diagrams (51 points)
 - Design checks with DCR ratios for bending, shear, and deflection
-- CLI with JSON-in/JSON-out
+
+**Wood Column:**
+- NDS 2018 Section 3.7 column stability factor (Cp) with biaxial buckling
+- NDS 2018 Section 3.9 combined axial + bending interaction (Eq. 3.9-3)
+- Per-combo load duration adjustment across all 21 ASD combos
+- Supports axial loads + biaxial moments, self-weight, effective length factors (Ke)
+- Design checks with DCR ratios for compression and interaction
+
+Both modules use CLI with JSON-in/JSON-out.
 
 ### Quick Start
 
 ```bash
 zig build
 
-echo '{"module":"wood_beam","span_ft":12,"material":{"type":"sawn_lumber","species":"DF-L","grade":"No.2"},"width_in":1.5,"depth_in":9.25,"dead_load_plf":15,"live_load_plf":40,"include_self_weight":true,"moisture":"dry","temperature":"normal","incising":"none","repetitive":"repetitive","compression_edge_braced":true,"deflection_limit_ll":360,"deflection_limit_tl":240}' | zig-out/bin/zenercalc
+# Wood beam
+echo '{"module":"wood_beam","span_ft":12,"material":{"type":"sawn_lumber","species":"DF-L","grade":"No.2"},"width_in":1.5,"depth_in":9.25,"dead_load_plf":15,"live_load_plf":40,"include_self_weight":true}' | zig-out/bin/zenercalc
+
+# Wood column
+echo '{"module":"wood_column","height_ft":10,"width_in":5.5,"depth_in":5.5,"material":{"type":"sawn_lumber","species":"DF-L","grade":"No.2"},"axial_dead_lb":5000,"axial_live_lb":10000}' | zig-out/bin/zenercalc
 ```
 
 Output is pretty-printed JSON with section properties, NDS adjustment factors, actual stresses, and pass/fail status for each design check.
@@ -190,7 +203,8 @@ zenercalc/
 │   │   └── codes/
 │   │       └── nds2018.zig       # NDS 2018 adjustment factors + design checks
 │   └── modules/
-│       └── wood_beam.zig         # Inputs/Outputs/compute() for wood beams
+│       ├── wood_beam.zig         # Inputs/Outputs/compute() for wood beams
+│       └── wood_column.zig       # Inputs/Outputs/compute() for wood columns
 ├── data/
 │   ├── nds_lumber_2018.json      # NDS Table 4A audit trail (5 species x 4 grades)
 │   └── nds_glulam_2018.json      # NDS Table 5A/5B audit trail (7 stress classes)

@@ -133,7 +133,7 @@ we love you, Claude! do your best today
 
 ## Project Overview
 
-ZenerCalc is a structural engineering calculation tool written in Zig, aiming for feature parity with ENERCALC SEL 20 (64 calculation modules). Currently in Phase 1 (wood beam MVP). Licensed AGPL-3.0.
+ZenerCalc is a structural engineering calculation tool written in Zig, aiming for feature parity with ENERCALC SEL 20 (64 calculation modules). Phase 1 complete (wood beam + wood column). Licensed AGPL-3.0.
 
 ## Build Commands
 
@@ -161,12 +161,13 @@ zig-out/bin/zenercalc input.json                              # file arg
 ## Architecture
 
 - **src/root.zig** -- Library root, re-exports engine modules as `zenercalc` package
-- **src/main.zig** -- CLI entry point: JSON parse -> compute -> JSON output
-- **src/engine/math.zig** -- RectSection, Load union, analyzeSimpleBeam (51-point sweep)
+- **src/main.zig** -- CLI entry point: module dispatch, JSON parse -> compute -> JSON output
+- **src/engine/math.zig** -- RectSection (strong + weak axis, radius of gyration), Load union, analyzeSimpleBeam (51-point sweep)
 - **src/engine/loads.zig** -- LoadType, LoadCase, 21 ASCE 7-22 ASD combos, governingAsd()
-- **src/engine/materials/wood.zig** -- Species/Grade enums, comptime lumber (20) + glulam (7) tables
-- **src/engine/codes/nds2018.zig** -- All 8 NDS factors, adjustedValues(), effectiveLength()
-- **src/modules/wood_beam.zig** -- Inputs/Outputs structs, compute() orchestrating full design check
+- **src/engine/materials/wood.zig** -- Species/Grade enums, comptime lumber (20) + glulam (7) tables, ReferenceProps, WoodMaterial union
+- **src/engine/codes/nds2018.zig** -- NDS beam factors + adjustedValues(), Cp column stability + columnAdjustedValues(), effectiveLength()
+- **src/modules/wood_beam.zig** -- Inputs/Outputs structs, compute() orchestrating full beam design check
+- **src/modules/wood_column.zig** -- Inputs/Outputs structs, compute() with NDS 3.7 Cp and 3.9-3 interaction equation
 - **data/*.json** -- Audit trail copies of material data (runtime uses comptime Zig constants)
 - **build.zig** -- Build system with two test executables: `mod_tests` (from root.zig) and `exe_tests` (from main.zig)
 
