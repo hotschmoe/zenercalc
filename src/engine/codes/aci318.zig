@@ -61,12 +61,16 @@ pub fn twoWayShearCapacity(fc: f64, lambda: f64, bo: f64, d: f64, beta: f64, pos
     const vc3_stress = (2.0 + alpha_s * d / bo) * lambda * sqrt_fc;
     const vc3 = vc3_stress * bo * d;
 
-    const min12 = @min(vc1, vc2);
-    const vc_gov = @min(min12, vc3);
-
+    var vc_gov = vc1;
     var gov_eq: u8 = 1;
-    if (vc_gov == vc2) gov_eq = 2;
-    if (vc_gov == vc3) gov_eq = 3;
+    if (vc2 < vc_gov) {
+        vc_gov = vc2;
+        gov_eq = 2;
+    }
+    if (vc3 < vc_gov) {
+        vc_gov = vc3;
+        gov_eq = 3;
+    }
 
     return .{
         .vc1 = vc1,

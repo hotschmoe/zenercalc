@@ -744,8 +744,7 @@ fn writeFootingOutputs(out: spread_footing.Outputs) !void {
         \\  "one_way_shear": {{
         \\    "Vu_L_lb": {d:.1},
         \\    "Vu_B_lb": {d:.1},
-        \\    "phi_Vc_L_lb": {d:.1},
-        \\    "phi_Vc_B_lb": {d:.1},
+        \\    "phi_Vc_lb": {d:.1},
         \\    "dcr": {d:.3},
         \\    "governing_combo": "{s}",
         \\    "status": "{s}"
@@ -766,8 +765,7 @@ fn writeFootingOutputs(out: spread_footing.Outputs) !void {
     , .{
         out.vu_one_way_l_lb,
         out.vu_one_way_b_lb,
-        out.phi_vc_one_way_l_lb,
-        out.phi_vc_one_way_b_lb,
+        out.phi_vc_one_way_lb,
         out.one_way_shear_dcr,
         out.one_way_combo_name[0..out.one_way_combo_len],
         statusStr(out.one_way_shear_status),

@@ -105,8 +105,7 @@ pub const Outputs = struct {
     // One-way shear (factored LRFD) -- check both directions
     vu_one_way_l_lb: f64, // critical in L direction
     vu_one_way_b_lb: f64, // critical in B direction
-    phi_vc_one_way_l_lb: f64,
-    phi_vc_one_way_b_lb: f64,
+    phi_vc_one_way_lb: f64, // capacity per ft width (same both directions)
     one_way_shear_dcr: f64,
     one_way_combo_name: [32]u8,
     one_way_combo_len: u8,
@@ -163,6 +162,15 @@ pub const ComputeError = error{
     ColumnExceedsFooting,
     InsufficientDepth,
 };
+
+const ComboName = struct { buf: [32]u8, len: u8 };
+
+fn copyComboName(name: []const u8) ComboName {
+    var buf: [32]u8 = .{0} ** 32;
+    const n: u8 = @intCast(@min(name.len, 32));
+    @memcpy(buf[0..n], name[0..n]);
+    return .{ .buf = buf, .len = n };
+}
 
 pub fn compute(inp: Inputs) ComputeError!Outputs {
     // 1. Validate
@@ -254,8 +262,8 @@ pub fn compute(inp: Inputs) ComputeError!Outputs {
         if (p <= 0) continue; // no bearing for uplift
 
         // Eccentricities (in feet)
-        const ex_ft = if (p > 0) @abs(my_val) / p else 0;
-        const ey_ft = if (p > 0) @abs(mx_val) / p else 0;
+        const ex_ft = @abs(my_val) / p;
+        const ey_ft = @abs(mx_val) / p;
 
         // Kern limits
         const kern_x = inp.length_ft / 6.0;
@@ -382,7 +390,6 @@ pub fn compute(inp: Inputs) ComputeError!Outputs {
     var worst_2way_idx: usize = 0;
     var worst_mu_l: f64 = 0;
     var worst_mu_b: f64 = 0;
-    var worst_flex_dcr: f64 = 0;
     var worst_flex_idx: usize = 0;
 
     // Precompute shear capacities (constant for all combos)
@@ -391,9 +398,8 @@ pub fn compute(inp: Inputs) ComputeError!Outputs {
     const cant_l_in = (length_in - inp.c1_in) / 2.0; // cantilever in L direction
     const cant_b_in = (width_in - inp.c2_in) / 2.0; // cantilever in B direction
 
-    // phi*Vc for one-way shear (per foot of width)
-    const phi_vc_1way_l = aci.phi_shear * aci.oneWayShearCapacity(fc, lambda, 12.0, d);
-    const phi_vc_1way_b = aci.phi_shear * aci.oneWayShearCapacity(fc, lambda, 12.0, d);
+    // phi*Vc for one-way shear per foot of width (same capacity both directions)
+    const phi_vc_one_way = aci.phi_shear * aci.oneWayShearCapacity(fc, lambda, 12.0, d);
 
     // Two-way shear
     const bo = if (inp.column_shape == .circular)
@@ -427,8 +433,7 @@ pub fn compute(inp: Inputs) ComputeError!Outputs {
             vu_1way_b = qu_psf * (shear_span_b / 12.0);
         }
         const vu_1way = @max(vu_1way_l, vu_1way_b);
-        const phi_vc_1way = if (vu_1way == vu_1way_l) phi_vc_1way_l else phi_vc_1way_b;
-        const dcr_1way = if (phi_vc_1way > 0) vu_1way / phi_vc_1way else 0;
+        const dcr_1way = if (phi_vc_one_way > 0) vu_1way / phi_vc_one_way else 0;
 
         if (dcr_1way > worst_1way_dcr) {
             worst_1way_dcr = dcr_1way;
@@ -460,23 +465,10 @@ pub fn compute(inp: Inputs) ComputeError!Outputs {
         const mu_l_ft_lb = qu_psf * (cant_l_in / 12.0) * (cant_l_in / 12.0) / 2.0;
         const mu_b_ft_lb = qu_psf * (cant_b_in / 12.0) * (cant_b_in / 12.0) / 2.0;
         const mu_gov = @max(mu_l_ft_lb, mu_b_ft_lb);
-        const mu_in_lb = mu_gov * 12.0; // convert ft-lb to in-lb
-
-        // phi*Mn for provided steel (computed below, but track worst Mu for DCR)
-        // For DCR tracking, compute required As
-        const as_req = aci.requiredFlexuralSteel(mu_in_lb, fc, fy, 12.0, d);
-        const as_min = aci.minimumFlexuralSteel(fy, 12.0, inp.thickness_in, d);
-        const as_design = @max(as_req, as_min);
-
-        // phi*Mn from as_design
-        const a_block = as_design * fy / (0.85 * fc * 12.0);
-        const phi_mn = aci.phi_flexure * as_design * fy * (d - a_block / 2.0);
-        const dcr_flex = if (phi_mn > 0) mu_in_lb / phi_mn else 0;
 
         if (mu_gov > @max(worst_mu_l, worst_mu_b)) {
             worst_mu_l = mu_l_ft_lb;
             worst_mu_b = mu_b_ft_lb;
-            worst_flex_dcr = dcr_flex;
             worst_flex_idx = i;
         }
     }
@@ -524,25 +516,10 @@ pub fn compute(inp: Inputs) ComputeError!Outputs {
         dev_status == .pass and ot_status == .pass and sl_status == .pass) .pass else .fail;
 
     // Copy combo names
-    var bearing_name: [32]u8 = .{0} ** 32;
-    const bn = loads_mod.asd_combinations[worst_bearing_idx].name;
-    const bn_len: u8 = @intCast(@min(bn.len, 32));
-    @memcpy(bearing_name[0..bn_len], bn[0..bn_len]);
-
-    var ow_name: [32]u8 = .{0} ** 32;
-    const own = loads_mod.lrfd_combinations[worst_1way_idx].name;
-    const own_len: u8 = @intCast(@min(own.len, 32));
-    @memcpy(ow_name[0..own_len], own[0..own_len]);
-
-    var tw_name: [32]u8 = .{0} ** 32;
-    const twn = loads_mod.lrfd_combinations[worst_2way_idx].name;
-    const twn_len: u8 = @intCast(@min(twn.len, 32));
-    @memcpy(tw_name[0..twn_len], twn[0..twn_len]);
-
-    var fl_name: [32]u8 = .{0} ** 32;
-    const fln = loads_mod.lrfd_combinations[worst_flex_idx].name;
-    const fln_len: u8 = @intCast(@min(fln.len, 32));
-    @memcpy(fl_name[0..fln_len], fln[0..fln_len]);
+    const bearing_name = copyComboName(loads_mod.asd_combinations[worst_bearing_idx].name);
+    const ow_name = copyComboName(loads_mod.lrfd_combinations[worst_1way_idx].name);
+    const tw_name = copyComboName(loads_mod.lrfd_combinations[worst_2way_idx].name);
+    const fl_name = copyComboName(loads_mod.lrfd_combinations[worst_flex_idx].name);
 
     return .{
         .footing_area_sf = area_sf,
@@ -557,16 +534,15 @@ pub fn compute(inp: Inputs) ComputeError!Outputs {
         .eccentricity_y_in = worst_ey,
         .kern_exceeded = worst_kern,
         .bearing_dcr = worst_bearing_dcr,
-        .bearing_combo_name = bearing_name,
-        .bearing_combo_len = bn_len,
+        .bearing_combo_name = bearing_name.buf,
+        .bearing_combo_len = bearing_name.len,
 
         .vu_one_way_l_lb = worst_vu_1way_l,
         .vu_one_way_b_lb = worst_vu_1way_b,
-        .phi_vc_one_way_l_lb = phi_vc_1way_l,
-        .phi_vc_one_way_b_lb = phi_vc_1way_b,
+        .phi_vc_one_way_lb = phi_vc_one_way,
         .one_way_shear_dcr = worst_1way_dcr,
-        .one_way_combo_name = ow_name,
-        .one_way_combo_len = own_len,
+        .one_way_combo_name = ow_name.buf,
+        .one_way_combo_len = ow_name.len,
 
         .vu_two_way_lb = worst_vu_2way,
         .bo_in = bo,
@@ -576,8 +552,8 @@ pub fn compute(inp: Inputs) ComputeError!Outputs {
         .vc3_lb = two_way_result.vc3,
         .governing_vc_eq = two_way_result.governing_eq,
         .two_way_shear_dcr = worst_2way_dcr,
-        .two_way_combo_name = tw_name,
-        .two_way_combo_len = twn_len,
+        .two_way_combo_name = tw_name.buf,
+        .two_way_combo_len = tw_name.len,
 
         .mu_l_ft_lb = worst_mu_l,
         .mu_b_ft_lb = worst_mu_b,
@@ -587,8 +563,8 @@ pub fn compute(inp: Inputs) ComputeError!Outputs {
         .bar_spacing_in = spacing_used,
         .phi_mn_ft_lb = phi_mn / 12.0, // convert in-lb back to ft-lb
         .flexure_dcr = final_flex_dcr,
-        .flexure_combo_name = fl_name,
-        .flexure_combo_len = fln_len,
+        .flexure_combo_name = fl_name.buf,
+        .flexure_combo_len = fl_name.len,
 
         .ld_required_in = ld_required,
         .ld_available_in = ld_available,

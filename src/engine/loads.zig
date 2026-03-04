@@ -80,37 +80,11 @@ pub const GoverningResult = struct {
 };
 
 pub fn governingAsd(case: LoadCase) GoverningResult {
-    var max_total: f64 = -std.math.inf(f64);
-    var max_name: []const u8 = "";
-    var max_idx: usize = 0;
-
-    for (asd_combinations, 0..) |c, i| {
-        const total = c.apply(case);
-        if (total > max_total) {
-            max_total = total;
-            max_name = c.name;
-            max_idx = i;
-        }
-    }
-
-    return .{ .combo_name = max_name, .total = max_total, .index = max_idx };
+    return governing(&asd_combinations, case);
 }
 
 pub fn minimumAsd(case: LoadCase) GoverningResult {
-    var min_total: f64 = std.math.inf(f64);
-    var min_name: []const u8 = "";
-    var min_idx: usize = 0;
-
-    for (asd_combinations, 0..) |c, i| {
-        const total = c.apply(case);
-        if (total < min_total) {
-            min_total = total;
-            min_name = c.name;
-            min_idx = i;
-        }
-    }
-
-    return .{ .combo_name = min_name, .total = min_total, .index = min_idx };
+    return minimum(&asd_combinations, case);
 }
 
 // ASCE 7-22 Section 2.3.1 LRFD Load Combinations
@@ -136,37 +110,45 @@ pub const lrfd_combinations = [_]LoadCombo{
 };
 
 pub fn governingLrfd(case: LoadCase) GoverningResult {
-    var max_total: f64 = -std.math.inf(f64);
-    var max_name: []const u8 = "";
-    var max_idx: usize = 0;
-
-    for (lrfd_combinations, 0..) |c, i| {
-        const total = c.apply(case);
-        if (total > max_total) {
-            max_total = total;
-            max_name = c.name;
-            max_idx = i;
-        }
-    }
-
-    return .{ .combo_name = max_name, .total = max_total, .index = max_idx };
+    return governing(&lrfd_combinations, case);
 }
 
 pub fn minimumLrfd(case: LoadCase) GoverningResult {
-    var min_total: f64 = std.math.inf(f64);
-    var min_name: []const u8 = "";
-    var min_idx: usize = 0;
+    return minimum(&lrfd_combinations, case);
+}
 
-    for (lrfd_combinations, 0..) |c, i| {
+fn governing(combos: []const LoadCombo, case: LoadCase) GoverningResult {
+    var best_total: f64 = -std.math.inf(f64);
+    var best_name: []const u8 = "";
+    var best_idx: usize = 0;
+
+    for (combos, 0..) |c, i| {
         const total = c.apply(case);
-        if (total < min_total) {
-            min_total = total;
-            min_name = c.name;
-            min_idx = i;
+        if (total > best_total) {
+            best_total = total;
+            best_name = c.name;
+            best_idx = i;
         }
     }
 
-    return .{ .combo_name = min_name, .total = min_total, .index = min_idx };
+    return .{ .combo_name = best_name, .total = best_total, .index = best_idx };
+}
+
+fn minimum(combos: []const LoadCombo, case: LoadCase) GoverningResult {
+    var best_total: f64 = std.math.inf(f64);
+    var best_name: []const u8 = "";
+    var best_idx: usize = 0;
+
+    for (combos, 0..) |c, i| {
+        const total = c.apply(case);
+        if (total < best_total) {
+            best_total = total;
+            best_name = c.name;
+            best_idx = i;
+        }
+    }
+
+    return .{ .combo_name = best_name, .total = best_total, .index = best_idx };
 }
 
 // Determine load duration from governing combo's load types.
